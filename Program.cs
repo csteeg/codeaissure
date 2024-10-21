@@ -1,7 +1,6 @@
 ﻿using System.CommandLine;
 using System.Text;
 using System.Text.Json;
-using Azure;
 using Azure.AI.OpenAI;
 using CodeAissure.Models;
 using LibGit2Sharp;
@@ -28,25 +27,25 @@ namespace CodeAissure
             Option<string> repoOption = new(
                                 new[] { "--repopath", "-r" },
                                 "The path to the Git repository");
-            Option<string> baseBranchOption = new(
-                                new[] { "--base", "-b" },
-                                "The name of the base Git branch.");
             Option<string?> outputOption = new(
                                 new[] { "--output", "-o" },
                                 "Filename to output contents.");
-            Option<string> compareBranchOption = new(
-                                new[] { "--compare", "-c" },
+            Option<string> fromBranchOption = new(
+                                new[] { "--base", "-b" },
+                                "The name of the base Git branch.");
+            Option<string> targetBranchOption = new(
+                                new[] { "--target", "-t" },
                                 "The name of the compare Git branch");
             Option<int> maxFileTokens = new(
                                 new[] { "--max-tokens", "-mt" },
                                 getDefaultValue: () => 25000,
                                 "The maximum number of charachters per diff to send to openai");
-            Command reviewCommand = new("reviewchanges", "Create a review for changes between to branches") { apikeyOption, apiendpointOption, modelOption, repoOption, baseBranchOption, compareBranchOption, maxFileTokens, outputOption };
+            Command reviewCommand = new("reviewchanges", "Create a review for changes between to branches") { apikeyOption, apiendpointOption, modelOption, repoOption, fromBranchOption, targetBranchOption, maxFileTokens, outputOption };
             // Parse the command-line arguments
             RootCommand rootCommand = new("OpenAI-based code review tool");
             rootCommand.AddCommand(reviewCommand);
 
-            reviewCommand.SetHandler(GetPullRequestReviewAsync, apikeyOption, apiendpointOption, modelOption, repoOption, baseBranchOption, compareBranchOption, maxFileTokens, outputOption);
+            reviewCommand.SetHandler(GetPullRequestReviewAsync, apikeyOption, apiendpointOption, modelOption, repoOption, fromBranchOption, targetBranchOption, maxFileTokens, outputOption);
 
             return rootCommand.InvokeAsync(args);
         }
@@ -105,7 +104,7 @@ namespace CodeAissure
                 output.Write($"Error!: Could not find branch {baseBranch} in repo {repoPath}");
                 return;
             }
-            Commit? compareCommit = repo.Branches[compareBranch]?.Tip;
+            Commit? compareCommit = repo.ObjectDatabase.FindMergeBase(baseCommit, repo.Branches[compareBranch]?.Tip);
             if (compareCommit == null)
             {
                 output.Write($"Error!: Could not find branch {compareBranch} in repo {repoPath}");
@@ -123,7 +122,7 @@ namespace CodeAissure
             List<string> results = [];
 
             // Call the OpenAI API to generate the description of the change
-            AzureOpenAIClient client = new(new Uri(apiendpoint), new AzureKeyCredential(apiKey));
+            AzureOpenAIClient client = new(new Uri(apiendpoint), new System.ClientModel.ApiKeyCredential(apiKey));
             ChatClient chat = client.GetChatClient(model);
             //await output.WriteLineAsync("[");
             List<PullRequestReviewFile> reviewdFiles = [];
@@ -185,6 +184,11 @@ namespace CodeAissure
 
             string summary = await GetChatResultsAsync(chat, model, new SystemChatMessage(Prompts.SystemMessage), new SystemChatMessage(Prompts.SummarizeTotalSystemMessage), new UserChatMessage(JsonSerializer.Serialize(reviewdFiles)));
             await output.WriteLineAsync(summary);
+
+            await output.WriteLineAsync("\n\n### The raw json output for the file reviews was: ");
+            await output.WriteLineAsync("\n```json");
+            await output.WriteLineAsync(JsonSerializer.Serialize(reviewdFiles));
+            await output.WriteLineAsync("```");
         }
     }
 }
