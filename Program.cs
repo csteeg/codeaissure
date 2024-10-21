@@ -187,7 +187,7 @@ namespace CodeAissure
 
             await output.WriteLineAsync("\n\n### The raw json output for the file reviews was: ");
             await output.WriteLineAsync("\n```json");
-            await output.WriteLineAsync(JsonSerializer.Serialize(reviewdFiles));
+            await output.WriteLineAsync(JsonSerializer.Serialize(reviewdFiles, new JsonSerializerOptions { WriteIndented = true }));
             await output.WriteLineAsync("```");
         }
     }
