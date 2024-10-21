@@ -112,7 +112,7 @@ namespace CodeAissure
             }
 
             // Get the diff between the two branches
-            TreeChanges changes = repo.Diff.Compare<TreeChanges>(baseCommit.Tree, compareCommit.Tree);
+            TreeChanges changes = repo.Diff.Compare<TreeChanges>(compareCommit.Tree, baseCommit.Tree);
             if (!changes?.Any() ?? false)
             {
                 output.Write($"Warning: No changes found between {baseBranch} and {compareBranch} in repo {repoPath}");
