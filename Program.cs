@@ -133,7 +133,7 @@ namespace CodeAissure
                 if (change.Status != ChangeKind.Unmodified)
                 {
                     // Get the patch for the change
-                    string? patch = repo.Diff.Compare<Patch>(baseCommit.Tree, compareCommit.Tree, new[] { change.Path }).FirstOrDefault()?.Patch;
+                    string? patch = repo.Diff.Compare<Patch>(compareCommit.Tree, baseCommit.Tree, new[] { change.Path }).FirstOrDefault()?.Patch;
                     if (string.IsNullOrEmpty(patch))
                     {
                         continue;
