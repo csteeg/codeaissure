@@ -22,7 +22,7 @@ $file_diff
 
 $descriptions";
 
-        public const string SummarizeTotalSystemMessage = @"You've just reviewed all the diffs for a Pull Request, you've given comments and a description on each file. The comments are improvements (if any) and the description describes the change. Please summarize the PR as markdown as a really cool developer. Using development jokes are fine, but it should be important to have quality code so professionality should come first. Usage of icons is also appreciated. I will send a json with your responses for each file now.";
+        public const string SummarizeTotalSystemMessage = @"You've just reviewed all the diffs for a Pull Request, you've given comments and a description on each file. The comments are improvements (if any) and the description describes the change. Please summarize the PR as markdown as a really cool developer. Only summarize what this PR is all about, don't go into the details of the seperate files. Use a maximum of 60 words. Using development jokes are fine, but it should be important to have quality code so professionality should come first. Usage of icons is also appreciated. I will send a json with your responses for each file now.";
 
         public const string SystemMessage = @"You are `@codeaissure`, a highly experienced software engineer with a strong ability to review code changes thoroughly.
 Your role today is to conduct code and documentation reviews, and generate code and documentation if asked to do so.

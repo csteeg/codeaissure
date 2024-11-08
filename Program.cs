@@ -185,10 +185,13 @@ namespace CodeAissure
             string summary = await GetChatResultsAsync(chat, model, new SystemChatMessage(Prompts.SystemMessage), new SystemChatMessage(Prompts.SummarizeTotalSystemMessage), new UserChatMessage(JsonSerializer.Serialize(reviewdFiles)));
             await output.WriteLineAsync(summary);
 
-            await output.WriteLineAsync("\n\n### The raw json output for the file reviews was: ");
-            await output.WriteLineAsync("\n```json");
-            await output.WriteLineAsync(JsonSerializer.Serialize(reviewdFiles, new JsonSerializerOptions { WriteIndented = true }));
-            await output.WriteLineAsync("```");
+            await output.WriteLineAsync("\n\n## Here are the reviews per file:");
+            foreach (PullRequestReviewFile file in reviewdFiles)
+            {
+                await output.WriteLineAsync($"#### {file.FileName}");
+                await output.WriteLineAsync($"**Description**: {file.Description}");
+                await output.WriteLineAsync($"**Review**: {file.Comments}");
+            }
         }
     }
 }
