@@ -1,5 +1,6 @@
 ﻿using System.ClientModel;
 using System.CommandLine;
+using System.CommandLine.NamingConventionBinder;
 using System.Text;
 using System.Text.Json;
 using Azure.AI.OpenAI;
@@ -41,12 +42,16 @@ namespace CodeAissure
                                 new[] { "--max-tokens", "-mt" },
                                 getDefaultValue: () => 25000,
                                 "The maximum number of charachters per diff to send to openai");
-            Command reviewCommand = new("reviewchanges", "Create a review for changes between to branches") { apikeyOption, apiendpointOption, modelOption, repoOption, fromBranchOption, targetBranchOption, maxFileTokens, outputOption };
+            Option<int> maxFiles = new(
+                                new[] { "--max-files", "-mf" },
+                                getDefaultValue: () => 100,
+                                "The maximum number of files send to openai");
+            Command reviewCommand = new("reviewchanges", "Create a review for changes between to branches") { apikeyOption, apiendpointOption, modelOption, repoOption, fromBranchOption, targetBranchOption, maxFileTokens, maxFiles, outputOption };
             // Parse the command-line arguments
             RootCommand rootCommand = new("OpenAI-based code review tool");
             rootCommand.AddCommand(reviewCommand);
 
-            reviewCommand.SetHandler(GetPullRequestReviewAsync, apikeyOption, apiendpointOption, modelOption, repoOption, fromBranchOption, targetBranchOption, maxFileTokens, outputOption);
+            reviewCommand.Handler = CommandHandler.Create<string, string, string, string, string, string, int, int, string>(GetPullRequestReviewAsync);
 
             return rootCommand.InvokeAsync(args);
         }
@@ -79,7 +84,7 @@ namespace CodeAissure
             }
         }
 
-        private static async Task GetPullRequestReviewAsync(string apiKey, string apiendpoint, string model, string repoPath, string baseBranch, string compareBranch, int maxFileTokens, string? outputFile)
+        private static async Task GetPullRequestReviewAsync(string apiKey, string apiendpoint, string model, string repoPath, string @base, string target, int maxTokens, int maxFiles, string? output)
         {
             if (string.IsNullOrEmpty(apiKey))
             {
@@ -101,31 +106,31 @@ namespace CodeAissure
                 throw new ArgumentException($"'{nameof(repoPath)}' cannot be null or empty.", nameof(repoPath));
             }
 
-            if (string.IsNullOrEmpty(baseBranch))
+            if (string.IsNullOrEmpty(@base))
             {
-                throw new ArgumentException($"'{nameof(baseBranch)}' cannot be null or empty.", nameof(baseBranch));
+                throw new ArgumentException($"'{nameof(@base)}' cannot be null or empty.", nameof(@base));
             }
 
-            if (string.IsNullOrEmpty(compareBranch))
+            if (string.IsNullOrEmpty(target))
             {
-                throw new ArgumentException($"'{nameof(compareBranch)}' cannot be null or empty.", nameof(compareBranch));
+                throw new ArgumentException($"'{nameof(target)}' cannot be null or empty.", nameof(target));
             }
 
-            using TextWriter output = string.IsNullOrEmpty(outputFile) ? Console.Out : new StreamWriter(outputFile);
+            using TextWriter outputWriter = string.IsNullOrEmpty(output) ? Console.Out : new StreamWriter(output);
 
             // Open the Git repository
             using Repository repo = new(repoPath);
             // Retrieve the base branch and the compare branch
-            Commit? baseCommit = repo.Branches[baseBranch]?.Tip;
+            Commit? baseCommit = repo.Branches[@base]?.Tip;
             if (baseCommit == null)
             {
-                output.Write($"Error!: Could not find branch {baseBranch} in repo {repoPath}");
+                outputWriter.Write($"Error!: Could not find branch {@base} in repo {repoPath}");
                 return;
             }
-            Commit? compareCommit = repo.ObjectDatabase.FindMergeBase(baseCommit, repo.Branches[compareBranch]?.Tip);
+            Commit? compareCommit = repo.ObjectDatabase.FindMergeBase(baseCommit, repo.Branches[target]?.Tip);
             if (compareCommit == null)
             {
-                output.Write($"Error!: Could not find branch {compareBranch} in repo {repoPath}");
+                outputWriter.Write($"Error!: Could not find branch {target} in repo {repoPath}");
                 return;
             }
 
@@ -133,7 +138,7 @@ namespace CodeAissure
             TreeChanges changes = repo.Diff.Compare<TreeChanges>(compareCommit.Tree, baseCommit.Tree);
             if (!changes?.Any() ?? false)
             {
-                output.Write($"Warning: No changes found between {baseBranch} and {compareBranch} in repo {repoPath}");
+                outputWriter.Write($"Warning: No changes found between {@base} and {target} in repo {repoPath}");
                 return;
             }
 
@@ -165,7 +170,7 @@ namespace CodeAissure
                         continue;
                     }
 
-                    List<string> patchparts = StringChunker.SplitStringIntoChunks(patch, maxFileTokens);
+                    List<string> patchparts = StringChunker.SplitStringIntoChunks(patch, maxTokens);
                     string basePrompt = patchparts.Count > 1 ? Prompts.SendPartOfPatch : Prompts.SendPatch;
                     StringBuilder description = new();
                     StringBuilder review = new();
@@ -196,19 +201,25 @@ namespace CodeAissure
                     PullRequestReviewFile reviewedFile = new(change.Path, finalDescription.Trim(), review.ToString().Trim());
 
                     reviewdFiles.Add(reviewedFile);
+
+                    if (reviewdFiles.Count >= maxFiles)
+                    {
+                        outputWriter.WriteLine($"The PR contains too many files ({changes.Count}), stopped at {maxFiles}!");
+                        break;
+                    }
                 }
             }
             //await output.WriteLineAsync("]");
 
             string summary = await GetChatResultsAsync(chat, model, new SystemChatMessage(Prompts.SystemMessage), new SystemChatMessage(Prompts.SummarizeTotalSystemMessage), new UserChatMessage(JsonSerializer.Serialize(reviewdFiles)));
-            await output.WriteLineAsync(summary);
+            await outputWriter.WriteLineAsync(summary);
 
-            await output.WriteLineAsync("\n\n## Here are the reviews per file:");
+            await outputWriter.WriteLineAsync("\n\n## Here are the reviews per file:");
             foreach (PullRequestReviewFile file in reviewdFiles)
             {
-                await output.WriteLineAsync($"#### {file.FileName}");
-                await output.WriteLineAsync($"**Description**: {file.Description}");
-                await output.WriteLineAsync($"**Review**: {file.Comments}");
+                await outputWriter.WriteLineAsync($"#### {file.FileName}");
+                await outputWriter.WriteLineAsync($"**Description**: {file.Description}");
+                await outputWriter.WriteLineAsync($"**Review**: {file.Comments}");
             }
         }
     }
