@@ -1,4 +1,5 @@
-﻿using System.CommandLine;
+﻿using System.ClientModel;
+using System.CommandLine;
 using System.Text;
 using System.Text.Json;
 using Azure.AI.OpenAI;
@@ -50,15 +51,32 @@ namespace CodeAissure
             return rootCommand.InvokeAsync(args);
         }
 
-        private static async Task<string> GetChatResultsAsync(ChatClient client, string model, params ChatMessage[] messages)
+        private static Task<string> GetChatResultsAsync(ChatClient client, string model, params ChatMessage[] messages)
         {
-            System.ClientModel.ClientResult<ChatCompletion> result = await client.CompleteChatAsync(messages);
-            StringBuilder responseTexts = new();
-            foreach (ChatMessageContentPart? completion in result.Value.Content)
+            return GetChatResultsAsync(client, model, messages, 0);
+        }
+
+        private static async Task<string> GetChatResultsAsync(ChatClient client, string model, ChatMessage[] messages, int retryCount)
+        {
+            try
             {
-                _ = responseTexts.Append(completion.Text);
+                System.ClientModel.ClientResult<ChatCompletion> result = await client.CompleteChatAsync(messages);
+                StringBuilder responseTexts = new();
+                foreach (ChatMessageContentPart? completion in result.Value.Content)
+                {
+                    _ = responseTexts.Append(completion.Text);
+                }
+                return responseTexts.ToString();
             }
-            return responseTexts.ToString();
+            catch (ClientResultException exc)
+            {
+                if (exc.GetRawResponse()?.Status == 429 && retryCount < 3)
+                {
+                    await Task.Delay(4000);
+                    return await GetChatResultsAsync(client, model, messages, retryCount + 1);
+                }
+                throw;
+            }
         }
 
         private static async Task GetPullRequestReviewAsync(string apiKey, string apiendpoint, string model, string repoPath, string baseBranch, string compareBranch, int maxFileTokens, string? outputFile)
