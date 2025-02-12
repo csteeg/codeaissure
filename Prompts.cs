@@ -4,6 +4,7 @@
     {
         public const string PatchSystemMessage = @"I want you to describe a diff in max 20 words,
 be brief and don't mention that it's a diff, we know that already, only shortly describe what it does. End the description with --ENDOFDESC--. Next, I also want you to review the diff for any error,risks or bad code. If code is hard to read, you give suggestions to improve it for readability or mention that it should be documented if it isn't.
+Also, if there are changes related to caching, give an explicit warning about these changes.
 If there are any issues in the existing code please let me know and I will add your comment on the pull request for this file. If you did not find anything to improve or suggest only reply ""LGTM!"" and nothing else!";
 
         public const string SendPartOfPatch = @"I am providing a part of the diff for `$filename` below, please note that this is diff is not the complete diff because the entire diff is too large:
