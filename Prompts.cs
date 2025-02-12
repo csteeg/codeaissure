@@ -9,7 +9,7 @@ If you did not find anything to improve or suggest only reply ""LGTM!"" and noth
 
         public const string SendPartOfPatch = @"I am providing a part of the diff for `$filename` below, please note that this is diff is not the complete diff because the entire diff is too large:
 ```diff
-$file_diff  
+$file_diff
 ```";
 
         public const string SendPatch = @"I am providing diff for `$filename` below:
