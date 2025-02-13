@@ -211,14 +211,16 @@ namespace CodeAissure
             }
             //await output.WriteLineAsync("]");
 
-            string summary = await GetChatResultsAsync(chat, model, new SystemChatMessage(Prompts.SystemMessage), new SystemChatMessage(Prompts.SummarizeTotalSystemMessage), new UserChatMessage(JsonSerializer.Serialize(reviewdFiles)));
-            await outputWriter.WriteLineAsync(summary);
-
+            await outputWriter.WriteLineAsync("# Pull request summary");
             await outputWriter.WriteLineAsync("\n\n## Here are the reviews per file:");
             foreach (PullRequestReviewFile file in reviewdFiles)
             {
+                if (string.IsNullOrWhiteSpace(file.Comments))
+                {
+                    continue;
+                }
+
                 await outputWriter.WriteLineAsync($"#### {file.FileName}");
-                await outputWriter.WriteLineAsync($"**Description**: {file.Description}");
                 await outputWriter.WriteLineAsync($"**Review**: {file.Comments}");
             }
         }
